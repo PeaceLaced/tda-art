@@ -503,7 +503,7 @@ async def cli_main():
                     try:
                         
                         # build and place buy order
-                        buy_order_response = tda_client.place_order(int(ACCOUNT_ID), equity_buy_market(symbol_to_trade[0], SHARE_QUANTITY).build())
+                        buy_order_response = tda_client.place_order(int(ACCOUNT_ID), equity_buy_market(symbol_to_trade[0], SHARE_QUANTITY))
                         
                         # extract the order ID from the placed order
                         buy_order_id = Utils(tda_client, 
@@ -536,12 +536,15 @@ async def cli_main():
                                     # convert the order details to JSON
                                     buy_order_json = get_buy_order.json()
                                     
-                                    # add to sleep counter
-                                    sleep_counter = sleep_counter + 1
+                                    if buy_order_json['filledQuantity'] == 1:
+                                        break
+                                    else:
+                                        # add to sleep counter
+                                        sleep_counter = sleep_counter + 1
                                 
                                 # cancel the order if we get to this point
                                 if sleep_counter == 10:
-                                    cancel_buy_order_response = tda_client.cancel_order(buy_order_id, int(ACCOUNT_ID).build())
+                                    cancel_buy_order_response = tda_client.cancel_order(buy_order_id, int(ACCOUNT_ID))
                                     cancel_buy_order_json = cancel_buy_order_response.json()                       
                         
                                     # CRIT the data
@@ -569,7 +572,7 @@ async def cli_main():
                     try:
                         
                         # build and place the sell order
-                        sell_order_response = tda_client.place_order(int(ACCOUNT_ID), equity_sell_market(symbol_to_trade[0], SHARE_QUANTITY).build())
+                        sell_order_response = tda_client.place_order(int(ACCOUNT_ID), equity_sell_market(symbol_to_trade[0], SHARE_QUANTITY))
                         #.set_session(Session.SEAMLESS).set_duration(Duration.GOOD_TILL_CANCEL)
                         
                         # extract the order ID from the placed order
