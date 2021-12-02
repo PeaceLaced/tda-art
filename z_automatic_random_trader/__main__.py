@@ -210,7 +210,7 @@ async def cli_main():
     try:
 
         ####################################
-        ####  TDA ACCOUNT VARIABLES  ####
+        ####  TDA ACCOUNT VARIABLES     ####
         #### -------------------------- ####
         ####################################
         
@@ -221,7 +221,7 @@ async def cli_main():
         CASH_AVAILABLE_THRESHOLD = 3000
         
         ####################################
-        ####  STOCK SELECT VARIABLES ####
+        ####  STOCK SELECT VARIABLES    ####
         #### -------------------------- ####
         ####################################
         
@@ -252,11 +252,12 @@ async def cli_main():
         AVOID_THESE_STOCKS = []
         
         ####################################
-        ####  STOCK TRADE VARIABLES ####
+        ####  STOCK TRADE VARIABLES     ####
         #### -------------------------- ####
         ####################################        
         
         # how many shares will we buy each round
+        # TODO: propigate SHARE_QUANTITY to buy/sell checks after KILL_OR_FILL is added <>
         SHARE_QUANTITY = 1
         
         # how long should we hold the stock, in seconds
@@ -486,9 +487,10 @@ async def cli_main():
         ###########################################  
         
         
+        # these two numbers should always be the same
+        TRADE_CYCLE_DEFAULT = 275
+        TRADE_CYCLES = 275   
         
-
-        TRADE_CYCLES = 275        
         # stop trading when we reach TRADE_CYCLES limit
         while TRADE_CYCLES > 0:
             
@@ -548,7 +550,8 @@ async def cli_main():
                             buy_order_json = get_buy_order.json()
                             
                             if buy_order_json['filledQuantity'] == 1:
-                                break
+                                # report successful buy order after waiting for fill
+                                progress.s('PLACING_AN_ORDER_(buy_random_(' + symbol_to_trade[0] + '))')
                             else:
                                 # add to sleep counter
                                 sleep_counter = sleep_counter + 1
@@ -561,11 +564,20 @@ async def cli_main():
                             # CRIT the data
                             progress.e(cancel_buy_order_json)
                             # TODO crit only useful infos <>
-                
+                else:
+                    # report successful buy order when it is automatically filled
+                    progress.s('PLACING_AN_ORDER_(buy_random_(' + symbol_to_trade[0] + '))')
+                    
             except Exception as err:
+                
+                # report errors and responses that are caught
                 progress.e(f'Unexpected {err=}, {type(err)=} (' + symbol_to_trade[0] + ')') 
-                progress.e(buy_order_response.json())
-            progress.s('PLACING_AN_ORDER_(buy_random_(' + symbol_to_trade[0] + '))')
+                buy_response_error = buy_order_response.json()
+                progress.e(buy_response_error)
+                
+                # remove the stock that causes 'Contact us' error.
+                if buy_response_error['error'] == 'Opening transactions for this security must be placed with a broker. Contact us.':
+                    stocks_to_trade.remove(symbol_to_trade[0])
             
             ###########################################
             ########  SLEEP BEFORE SELL  ##############
@@ -629,7 +641,7 @@ async def cli_main():
             
             # sleep before we buy another stock
             sleep(WAIT_BEFORE_BUYING_AGAIN)
-            progress.s('SLEEPING_(ending_cycle(' + str(WAIT_BEFORE_BUYING_AGAIN) + '_seconds))')
+            progress.s('SLEEPING_(ending_cycle(' + str(TRADE_CYCLE_DEFAULT-TRADE_CYCLES) + ' of ' + str(TRADE_CYCLE_DEFAULT) + '))')
             
             # decrease TRADE_CYCLES
             TRADE_CYCLES = TRADE_CYCLES - 1
