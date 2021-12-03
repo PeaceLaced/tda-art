@@ -117,6 +117,26 @@ async def cli_main():
                 logger.add('MAIN_art_{time:DD-MMM-YYYY}.log', format= self.format_file_log, level='ERROR')
                 logger.add(stderr, format=self.format_stderr_log, level='ERROR')
                 logger.error(message)
+            
+            # use for logging symbol, buy, sell price for easy parsing    
+            def crit(self, message):
+                logger.remove()
+                logger.add('CRIT_art_{time:DD-MMM-YYYY}.log', format= self.format_file_log, level='CRITICAL')
+                logger.add(stderr, format=self.format_stderr_log, level='CRITICAL')
+                logger.critical(message)
+                
+            # use to log buy and sell JSON data, FILE ONLY   
+            def debug(self, message):
+                logger.remove()
+                logger.add('DEBUG_art_{time:DD-MMM-YYYY}.log', format= self.format_file_log, level='DEBUG')
+                logger.debug(message)
+                
+            # use to log profit/loss from each buy/sell combo   
+            def trace(self, message):
+                logger.remove()
+                logger.add('TRACE_art_{time:DD-MMM-YYYY}.log', format= self.format_file_log, level='TRACE')
+                logger.add(stderr, format=self.format_stderr_log, level='TRACE')
+                logger.trace(message)
                 
             ####################################
             ####   MISC PROGRESS METHODS    ####
@@ -237,7 +257,7 @@ async def cli_main():
         VOLATILITY_TAIL = 'TOP'
         
         # VOLATILITY_THRESHOLD > abs(0-netchange) where netchange is (day_before_yesterday - yesterday)
-        VOLATILITY_THRESHOLD = 0.1
+        VOLATILITY_THRESHOLD = 0.2
 
         # only select stocks between these two price points
         STOCK_PRICE_LOW = 2.00
@@ -255,6 +275,12 @@ async def cli_main():
         ####  STOCK TRADE VARIABLES     ####
         #### -------------------------- ####
         ####################################        
+                
+        # these two numbers should stay the same
+        # how many times do we want to buy and sell a random stock
+        # trade_cycle means, take position this many times
+        TRADE_CYCLE_DEFAULT = 225
+        TRADE_CYCLES = 225   
         
         # how many shares will we buy each round
         # TODO: propigate SHARE_QUANTITY to buy/sell checks after KILL_OR_FILL is added <>
@@ -269,7 +295,7 @@ async def cli_main():
         # stop trying to buy a stock if it fails to fill, in seconds
         STOP_TRYING_TO_BUY = 10
         
-        # report variables the log
+        # report variables to the log
         def report_control_variables():
             progress.w('(' + str(CASH_TO_SPEND) + ')_CASH_TO_SPEND')
             progress.w('(' + str(CASH_AVAILABLE_THRESHOLD) + ')_CASH_AVAILABLE_THRESHOLD')
@@ -388,9 +414,9 @@ async def cli_main():
             volatile_stocks = []
             
             # tuple the useful data (symbol, lastsale, netchange, marketCap)
-            for symbol_data in screener['data']['table']['rows']:
+            for symbol_data in tqdm(screener['data']['table']['rows']):
                 
-                # capture the close price of the symbol
+                # capture the close price of the symbol, removing the dollar sigh
                 symbol_close_price = symbol_data['lastsale'].replace('$','')
                 
                 # remove symbols that contain slash, carrot, or space
@@ -436,7 +462,7 @@ async def cli_main():
             def extract_symbols(volatile_stock_tuples):
                 
                 # pull the symbol from the tuple
-                for stock in volatile_stock_tuples:
+                for stock in tqdm(volatile_stock_tuples):
                     symbol_only_list.append(stock[0])
                     
                 # return the list of symbols only    
@@ -470,42 +496,36 @@ async def cli_main():
                     sys.exit()
 
         
-        # run the filter function and get our stock tuples
+        # run the filter function and get our stock list
         stocks_to_trade = get_high_volatility_stocks_price_limited(nasdaq_screener_data,
-                                                                NUMBER_OF_STOCKS_IN_POOL,
-                                                                VOLATILITY_TAIL,
-                                                                VOLATILITY_THRESHOLD,
-                                                                STOCK_PRICE_LOW,
-                                                                STOCK_PRICE_HIGH,
-                                                                ADD_THESE_STOCKS,
-                                                                AVOID_THESE_STOCKS,
-                                                                )
-        
+                                                                   NUMBER_OF_STOCKS_IN_POOL,
+                                                                   VOLATILITY_TAIL,
+                                                                   VOLATILITY_THRESHOLD,
+                                                                   STOCK_PRICE_LOW,
+                                                                   STOCK_PRICE_HIGH,
+                                                                   ADD_THESE_STOCKS,
+                                                                   AVOID_THESE_STOCKS,
+                                                                   )
         
         ###########################################
         ########  MAIN CASH ACCOUNT LOOP  #########
         ###########################################  
         
-        
-        # these two numbers should always be the same
-        TRADE_CYCLE_DEFAULT = 275
-        TRADE_CYCLES = 275   
-        
-        # stop trading when we reach TRADE_CYCLES limit
+        # stop trading when we reach TRADE_CYCLES defined above
         while TRADE_CYCLES > 0:
             
             ###########################################
             ########  RANDOMLY SELECT A SYMBOL  #######
             ###########################################
             
-            # generate a random number between 0 and our HIGH_VOL_STOCKS
+            # generate a random number between 0 and the length of the list
             random_number = random.randrange(len(stocks_to_trade))
             progress.s('GENERATE_RANDOM_NUMBER')
             
             # enumerate our list and randomly select a symbol
             symbol_to_trade = [random_symbol[1] for random_symbol in enumerate(stocks_to_trade) if random_number == random_symbol[0]]
             progress.s('SELECT_RANDOM_SYMBOL')
-            progress.e('WE_WILL_TRADE_(' + str(symbol_to_trade[0]) + ')')
+            progress.w('WE_WILL_TRADE_(' + str(symbol_to_trade[0]) + ')')
             
             ###########################################
             ########  PLACE BUY ORDER  ################
@@ -513,6 +533,7 @@ async def cli_main():
             
             # buy the random stock
             progress.i('PLACING_AN_ORDER_(buy_random_(' + symbol_to_trade[0] + '))')
+            progress.crit(symbol_to_trade[0])
             try:
                 
                 # build and place buy order
@@ -529,15 +550,19 @@ async def cli_main():
                 # convert the order details to JSON
                 buy_order_json = get_buy_order.json()
                 
-                # crit the DATA
-                progress.e(buy_order_json)
+                # log the DATA
+                progress.debug(buy_order_json)
+                
+                # create a counter to break out of fill loop
+                wait_counter = 0
                 
                 # check to make sure the order filled
                 if buy_order_json['filledQuantity'] != 1:
-                    while buy_order_json['filledQuantity'] < 1:
+                    
+                    # TODO: keep an eye on this
+                    while buy_order_json['filledQuantity'] < 1 or wait_counter < 9:
                         
-                        sleep_counter = 0
-                        while sleep_counter < 10:
+                        while wait_counter < 10:
                             
                             # sleep for 1 second
                             progress.w('WAITING_FOR_FILL_(buy_random_(' + symbol_to_trade[0] + '))')
@@ -552,21 +577,23 @@ async def cli_main():
                             if buy_order_json['filledQuantity'] == 1:
                                 # report successful buy order after waiting for fill
                                 progress.s('PLACING_AN_ORDER_(buy_random_(' + symbol_to_trade[0] + '))')
+                                progress.crit(buy_order_json['orderActivityCollection'][0]['executionLegs'][0]['price'])
+                                wait_counter = 11
                             else:
                                 # add to sleep counter
-                                sleep_counter = sleep_counter + 1
+                                wait_counter = wait_counter + 1
                         
-                        # cancel the order if we get to this point
-                        if sleep_counter == 10:
+                        # fill not successful, cancel the order
+                        if wait_counter == 10:
                             cancel_buy_order_response = tda_client.cancel_order(buy_order_id, int(ACCOUNT_ID))
                             cancel_buy_order_json = cancel_buy_order_response.json()                       
                 
-                            # CRIT the data
-                            progress.e(cancel_buy_order_json)
-                            # TODO crit only useful infos <>
+                            # log the data
+                            progress.debug(cancel_buy_order_json)
                 else:
                     # report successful buy order when it is automatically filled
                     progress.s('PLACING_AN_ORDER_(buy_random_(' + symbol_to_trade[0] + '))')
+                    progress.crit(buy_order_json['orderActivityCollection'][0]['executionLegs'][0]['price'])
                     
             except Exception as err:
                 
@@ -584,8 +611,8 @@ async def cli_main():
             ###########################################
             
             # sleep for however long we want to hold the stock
-            sleep(HOLD_STOCK_THIS_LONG)
             progress.s('SLEEPING_(hold_position_(' + str(HOLD_STOCK_THIS_LONG) + '_seconds))')
+            sleep(HOLD_STOCK_THIS_LONG)
             
             ###########################################
             ########  PLACE SELL ORDER  ###############
@@ -626,25 +653,28 @@ async def cli_main():
                 # fill is successful, report it
                 progress.s('WAITING_FOR_FILL_(sell_random_(' + symbol_to_trade[0] + '))')
                 
-                # CRIT the data
-                progress.e(sell_order_json)
-                # TODO crit only useful infos <>
+                # log the data
+                progress.debug(sell_order_json)
             
             except Exception as err:
                 progress.e(f'Unexpected {err=}, {type(err)=} (' + symbol_to_trade[0] + ')')
                 progress.e(sell_order_response.json())
             progress.s('PLACING_AN_ORDER_(sell_random_(' + symbol_to_trade[0] + '))')
+            progress.crit(sell_order_json['orderActivityCollection'][0]['executionLegs'][0]['price'])
+            progress.trace(sell_order_json['orderActivityCollection'][0]['executionLegs'][0]['price'] - buy_order_json['orderActivityCollection'][0]['executionLegs'][0]['price'])
 
             ###########################################
             ########  SLEEP BEFORE BUY  ###############
             ###########################################
             
             # sleep before we buy another stock
+            progress.w('SLEEPING_(ending_cycle(' + str(TRADE_CYCLE_DEFAULT-TRADE_CYCLES+1) + ' of ' + str(TRADE_CYCLE_DEFAULT) + '))')
             sleep(WAIT_BEFORE_BUYING_AGAIN)
-            progress.s('SLEEPING_(ending_cycle(' + str(TRADE_CYCLE_DEFAULT-TRADE_CYCLES) + ' of ' + str(TRADE_CYCLE_DEFAULT) + '))')
+            
             
             # decrease TRADE_CYCLES
             TRADE_CYCLES = TRADE_CYCLES - 1
+            wait_counter = 0
 
 ##############################################################################
 ######################    APPLICATION SHUTDOWN and EXIT TIMER    #############
