@@ -41,6 +41,7 @@ async def cli_main():
         from sys import stderr
         from time import sleep
         from datetime import datetime as dt
+        from decimal import setcontext, BasicContext, Decimal
         
         from loguru import logger
         from tqdm import tqdm, trange
@@ -70,7 +71,13 @@ async def cli_main():
 #######     - logger.critical('message')                              ########
 #######                                                               ########
 ##############################################################################
+######################    Pre-boot area for testing   ########################
+##############################################################################
 
+##############################################################################
+##############################################################################
+##############################################################################
+        
         # PROGRESS LOGGING
         class Progress:
             
@@ -96,45 +103,45 @@ async def cli_main():
             
             def i(self, message):
                 logger.remove()
-                logger.add('MAIN_art_{time:DD-MMM-YYYY}.log', format=self.format_file_log, level='INFO')
+                logger.add('LOGS/MAIN_art_{time:DD-MMM-YYYY}.log', format=self.format_file_log, level='INFO')
                 logger.add(stderr, format=self.format_stderr_log, level='INFO')
                 logger.info(message)
                 
             def s(self, message):
                 logger.remove()
-                logger.add('MAIN_art_{time:DD-MMM-YYYY}.log', format= self.format_file_log, level='SUCCESS')
+                logger.add('LOGS/MAIN_art_{time:DD-MMM-YYYY}.log', format= self.format_file_log, level='SUCCESS')
                 logger.add(stderr, format=self.format_stderr_log, level='SUCCESS')
                 logger.success(message)
             
             def w(self, message):
                 logger.remove()
-                logger.add('MAIN_art_{time:DD-MMM-YYYY}.log', format= self.format_file_log, level='WARNING')
+                logger.add('LOGS/MAIN_art_{time:DD-MMM-YYYY}.log', format= self.format_file_log, level='WARNING')
                 logger.add(stderr, format=self.format_stderr_log, level='WARNING')
                 logger.warning(message)
             
             def e(self, message):
                 logger.remove()
-                logger.add('MAIN_art_{time:DD-MMM-YYYY}.log', format= self.format_file_log, level='ERROR')
+                logger.add('LOGS/MAIN_art_{time:DD-MMM-YYYY}.log', format= self.format_file_log, level='ERROR')
                 logger.add(stderr, format=self.format_stderr_log, level='ERROR')
                 logger.error(message)
             
             # use for logging symbol, buy, sell price for easy parsing    
             def crit(self, message):
                 logger.remove()
-                logger.add('CRIT_art_{time:DD-MMM-YYYY}.log', format= self.format_file_log, level='CRITICAL')
+                logger.add('LOGS/CRIT_art_{time:DD-MMM-YYYY}.log', format= self.format_file_log, level='CRITICAL')
                 logger.add(stderr, format=self.format_stderr_log, level='CRITICAL')
                 logger.critical(message)
                 
             # use to log buy and sell JSON data, FILE ONLY   
             def debug(self, message):
                 logger.remove()
-                logger.add('DEBUG_art_{time:DD-MMM-YYYY}.log', format= self.format_file_log, level='DEBUG')
+                logger.add('LOGS/DEBUG_art_{time:DD-MMM-YYYY}.log', format= self.format_file_log, level='DEBUG')
                 logger.debug(message)
                 
             # use to log profit/loss from each buy/sell combo   
             def trace(self, message):
                 logger.remove()
-                logger.add('TRACE_art_{time:DD-MMM-YYYY}.log', format= self.format_file_log, level='TRACE')
+                logger.add('LOGS/TRACE_art_{time:DD-MMM-YYYY}.log', format= self.format_file_log, level='TRACE')
                 logger.add(stderr, format=self.format_stderr_log, level='TRACE')
                 logger.trace(message)
                 
@@ -257,7 +264,7 @@ async def cli_main():
         VOLATILITY_TAIL = 'TOP'
         
         # VOLATILITY_THRESHOLD > abs(0-netchange) where netchange is (day_before_yesterday - yesterday)
-        VOLATILITY_THRESHOLD = 0.2
+        VOLATILITY_THRESHOLD = 0.1
 
         # only select stocks between these two price points
         STOCK_PRICE_LOW = 2.00
@@ -279,8 +286,8 @@ async def cli_main():
         # these two numbers should stay the same
         # how many times do we want to buy and sell a random stock
         # trade_cycle means, take position this many times
-        TRADE_CYCLE_DEFAULT = 225
-        TRADE_CYCLES = 225   
+        TRADE_CYCLE_DEFAULT = 300
+        TRADE_CYCLES = 300   
         
         # how many shares will we buy each round
         # TODO: propigate SHARE_QUANTITY to buy/sell checks after KILL_OR_FILL is added <>
@@ -307,6 +314,8 @@ async def cli_main():
             progress.w('(' + str(STOCK_PRICE_HIGH) + ')_STOCK_PRICE_HIGH')
             progress.w('(' + str(len(ADD_THESE_STOCKS)) + ')_ADDING_THIS_COUNT')
             progress.w('(' + str(len(AVOID_THESE_STOCKS)) + ')_REMOVING_THIS_COUNT')
+            progress.w('(' + str(TRADE_CYCLE_DEFAULT) + ')_TRADE_CYCLE_DEFAULT')
+            progress.w('(' + str(TRADE_CYCLES) + ')_TRADE_CYCLES')
             progress.w('(' + str(SHARE_QUANTITY) + ')_SHARE_QUANTITY')
             progress.w('(' + str(HOLD_STOCK_THIS_LONG) + ')_HOLD_STOCK_THIS_LONG')
             progress.w('(' + str(WAIT_BEFORE_BUYING_AGAIN) + ')_WAIT_BEFORE_BUYING_AGAIN')
@@ -314,6 +323,14 @@ async def cli_main():
 
         report_control_variables()
         progress.s('REPORT_VARIABLES')
+
+        ####################################
+        ####      SET DECIMAL CONTEXT   ####
+        ####     ---------------------  ####
+        ####################################
+        
+        # basic context is decimal precision = 9 and rounding = round half even
+        setcontext(BasicContext)
         
         ####################################
         ####      REPORT BOOT TIME      ####
@@ -661,7 +678,10 @@ async def cli_main():
                 progress.e(sell_order_response.json())
             progress.s('PLACING_AN_ORDER_(sell_random_(' + symbol_to_trade[0] + '))')
             progress.crit(sell_order_json['orderActivityCollection'][0]['executionLegs'][0]['price'])
-            progress.trace(sell_order_json['orderActivityCollection'][0]['executionLegs'][0]['price'] - buy_order_json['orderActivityCollection'][0]['executionLegs'][0]['price'])
+            
+            # send profit to TRACE, just changed to Decimal, keep an eye on it.
+            progress.trace(Decimal(sell_order_json['orderActivityCollection'][0]['executionLegs'][0]['price']
+                                   ) - Decimal(buy_order_json['orderActivityCollection'][0]['executionLegs'][0]['price']))
 
             ###########################################
             ########  SLEEP BEFORE BUY  ###############
