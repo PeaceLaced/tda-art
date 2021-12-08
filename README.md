@@ -9,14 +9,10 @@ Automatic Random Trader for TD Ameritrade
 - Using the variables (shown and described below), a list of symbols 
   is generated, and from that list a random symbol is picked and traded.
 
-####################################
-####  STOCK SELECT VARIABLES    ####
-#### -------------------------- ####
-####################################
+- Volatility in this script is simply 
+  a change in price between the day before yesterday and yesterday
 
-# only select stocks between these two price points, in dollars
-STOCK_PRICE_LOW = 2.00
-STOCK_PRICE_HIGH = 5.00
+
 
 #################################################################
 #### PLEASE NOTE:   volatility in this script is simply      ####
