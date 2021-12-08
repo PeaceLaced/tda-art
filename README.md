@@ -1,72 +1,84 @@
 # tda-art
-Automatic Random Trader for TD Ameritrade
+Automatic Random Trader for TD Ameritrade (current version)
+Automatic Retail Trader for TD Ameritrade (future version)
+
+- requirements: TDA-API, loguru, tqdm
 
 - for educational purposes only/not financial advice
 
 - This is essentially a symbol selection script with trade functionality.
 
+- This may NOT work on the cloud (Nasdaq sometimes blocks access)
+- This should always work locally, but be aware each run pulls from Nasdaq.
 
-- Using the variables (shown and described below), a list of symbols 
-  is generated, and from that list a random symbol is picked and traded.
+- This script does NOT use or need a database.
+- This script does log to files, but can be easily converted to DB if you like.
 
-- Volatility in this script is simply 
-  a change in price between the day before yesterday and yesterday
+- This script trades using TDA-API's equity_buy_market() and equity_sell_market() methods.
+- These two methods are intended for LONG non LIMIT orders.
+- If you want LIMIT or SHORT, make the changes, but be warned, I have NOT used it in this way.
 
+- This script currently only works during normal market hours. 
+- It is easy to add pre and post market functionality, but I have no interest in trading those hours, so I will not add it.
+- SEE: https://tda-api.readthedocs.io/en/latest/order-builder.html#order-builder
+- SEE: https://tda-api.readthedocs.io/en/latest/order-builder.html#tda.orders.common.Session
 
+- Using the variables (shown and described below), a list of symbols is generated, and from that list a random symbol is picked and traded.
 
-#################################################################
-#### PLEASE NOTE:   volatility in this script is simply      ####
-####                a change in price between                ####
-####                the day before yesterday and yesterday   ####
-#################################################################
+- The word volatility in this script is simply a change in price between the day before yesterday and yesterday
+- This is obtained from the Nasdaq Screener under Net Change for each symbol.
+- All values extracted from the Nasdaq Screener are typically from the previous day, unless they update their screener mid day.
 
-# POSITIVE or NEGATIVE, VOLATILITY_TAIL is volatility in that direction
-VOLATILITY_TAIL = 'POSITIVE'
+- The variables below are located at around line 240, and are as follows:
 
-# VOLATILITY_THRESHOLD gives you volatility that is greater than your number, in dollars
-VOLATILITY_THRESHOLD = 0.1
+- STOCK_PRICE_LOW is the lowest price to filter
+- STOCK_PRICE_HIGH is the highest price to filter
+- You will always trade stocks between these two prices (relative to what the Nasdaq Screener places in the 'lastsale' field)
 
-# After tail and threshold, CUT isolates based on POOL
-# TOP, BOTTOM or CENTER, top is highest, bottom is lowest, center removes top and bottom
-VOLATILITY_CUT = 'BOTTOM'
+- VOLATILITY_TAIL can be POSITIVE or NEGATIVE
+- positive is a change between day before yesterday and yesterday in the positive direction (Nasdaq Screener 'netchange' field)
+- negative is a change between day before yesterday and yesterday in the negative direction (Nasdaq Screener 'netchange' field)
+- I have only ever used POSITIVE. 
 
-# how many stocks do you want in the pool to randomly pick from
-NUMBER_OF_STOCKS_IN_POOL = 75
+- VOLATILITY_THRESHOLD is the amount of change.
+- if TAIL is positive, it will select stocks that are greater than THRESHOLD in the positive direction
+- if TAIL is negative, it will select stocks that are grater than THRESHOLD in the negative direction
 
-# add or remove stocks manually (read as always/never trade)
-# calculated AFTER pool is established.
-ADD_THESE_STOCKS = []
-AVOID_THESE_STOCKS = []
+- VOLATILITY_CUT works within the TAIL after THRESHOLD
+- options here are TOP, BOTTOM and CENTER
+- this is used in conjunction with POOL
+- top will give you the stocks that changed the most
+- bottom will give you the stocks that changed the least
+- center cuts the top and bottom, and gives you the center. 
+- center typically skews toward bottom because high change in price is more rare
 
-# TODO: add an inline feature that reads from a file every cycle to add/avoid symbols<>
+- NUMBER_OF_STOCKS_IN_POOL can be set to any number. I typically play around with between 25 and 75.
+- pool is directly related to cut in that it gives you the amount toward the cut you select.
 
-####################################
-####  STOCK TRADE VARIABLES     ####
-#### -------------------------- ####
-####################################        
+- ADD_THESE_STOCKS allow you to put symbols into the list
+- AVOID_THESE_STOCKS will remove the stock if it happens to be selected
+- add and avoid happen after the pool is made, so it counts toward or against the pool.
+- example, 75 in pool, two add, one avoid, means 76 instead of 75
+- example, 50 in pool, four add, seven avoid, 47 instead of 50
 
-# these two numbers should stay the same
-# how many times do we want to buy and sell a random stock
-# trade_cycle means, take position this many times
-TRADE_CYCLE_DEFAULT = 300
-TRADE_CYCLES = 300   
+- TODO: I plan to add an inline feature that will read from a file to add and avoid while the script is running
 
-# how many shares will we buy each round
-# TODO: propigate SHARE_QUANTITY to buy/sell checks after KILL_OR_FILL is added <>
-SHARE_QUANTITY = 1
+- TRADE_CYCLE_DEFAULT and TRADE_CYCLES are exactly the same and should always be the same value
+- default is used to show how many total cycles are going to happen (reported every cycle)
+- cycles is used to show what cycle you are on (also reported every cycle)
 
-# how long should we hold the stock, in seconds
-HOLD_STOCK_THIS_LONG = 50
+- SHARE_QUANTITY is how many shares you want to buy and sell for the randomly selected symbol
+- ***CAUTION*** the script currently only supports 1 share.
+- a future release will allow for multiple shares and take advantage of fill_or_kill on the buy
 
-# after selling, how long before we buy again, in seconds
-WAIT_BEFORE_BUYING_AGAIN = 10
+- HOLD_STOCK_THIS_LONG is how long we hold the stock before selling. It is represented in seconds.
+- I build this script to scalp, and have never set this to higher than 50 seconds.
 
-# stop trying to buy a stock if it fails to fill, in seconds
-STOP_TRYING_TO_BUY = 10
+- WAIT_BEFORE_BUYING_AGAIN is how long to pause after the last stock sold, before buying again, represented in seconds
+- this in conjunction with hold_stock_this_long gives us one cycle, and roughtly equals the two added together (increases during fill waits)
 
-
-##############################################################################################
-##########   LONG DESCRIPTION   ##############################################################
-##############################################################################################
-- STOCK_PRICE_LOW and STOCK_PRICE_HIGH is self explanatory.
-- VOLATILITY_TAIL, VOLATILITY_THRESHOLD, VOLATILITY_CUT and NUMBER_OF_STOCKS_IN_POOL
+- STOP_TRYING_TO_BUY is the how many seconds to wait before a fail to fill cancels the order
+- my default has always been 10, but it never hits that mark. 
+- under the hood, every one second it asks tda about the order status, and after STOP_TRYING_TO_BUY is reached, it will cancel
+- this setting may go away once functionality for more shares is added and fill_or_kill is used
+- NOTE that this only pertains to the buy order. The sell order will cycle indefinetly until the order is filled.
