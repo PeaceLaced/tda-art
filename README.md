@@ -14,7 +14,7 @@ Automatic Retail Trader for TD Ameritrade (future version)
 - This should always work locally, but be aware each run pulls from Nasdaq.
 
 - This script does NOT use or need a database.
-- This script does log to files, but can be easily converted to DB if you like.
+- This script logs to a few different files, but can easily be converted to DB if you like.
 
 - This script trades using TDA-API's equity_buy_market() and equity_sell_market() methods.
 - These two methods are intended for LONG non LIMIT orders.
