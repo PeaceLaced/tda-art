@@ -78,7 +78,7 @@ async def cli_main():
 ##############################################################################
 ##############################################################################
         
-        # PROGRESS LOGGING
+        # PROGRESS REPORT (logging)
         class Progress:
             
             # set up log format for stderr and file
@@ -235,36 +235,24 @@ async def cli_main():
 ######################    KBInterrupt and CATCH ALL (application)   ##########
 ##############################################################################
     try:
-
-        ####################################
-        ####  TDA ACCOUNT VARIABLES     ####
-        #### -------------------------- ####
-        ####################################
-        
-        # how much money do you want to spend today?
-        CASH_TO_SPEND = 2000
-        
-        # keep your TDA account above this cash threshold
-        CASH_AVAILABLE_THRESHOLD = 3000
         
         ####################################
         ####  STOCK SELECT VARIABLES    ####
         #### -------------------------- ####
         ####################################
+       
+        # POSITIVE or NEGATIVE, VOLATILITY_TAIL is volatility in that direction
+        VOLATILITY_TAIL = 'POSITIVE'
+        
+        # VOLATILITY_THRESHOLD gives you volatility that is greater than your numbrer
+        VOLATILITY_THRESHOLD = 0.1
+        
+        # TOP or BOTTOM, VOLATILITY_CUT gives you higher(top) or lower(bottom) volatility within your tail
+        VOLATILITY_CUT = 'BOTTOM'
         
         # how many stocks do you want in the pool to randomly pick from
-        # TODO: keep this number high until I finish the filter logic <>
-        NUMBER_OF_STOCKS_IN_POOL = 200
-        
-        # consider market cap before volatility?
-        # TODO: not implemented yet <>
-        CONSIDER_MARKET_CAP = 'YES'
-        
-        # TOP or BOTTOM, both are high volatility, top is positive, bottom is negative
-        VOLATILITY_TAIL = 'TOP'
-        
-        # VOLATILITY_THRESHOLD > abs(0-netchange) where netchange is (day_before_yesterday - yesterday)
-        VOLATILITY_THRESHOLD = 0.1
+        # TODO: add this next <>
+        NUMBER_OF_STOCKS_IN_POOL = 500
 
         # only select stocks between these two price points
         STOCK_PRICE_LOW = 2.00
@@ -286,8 +274,8 @@ async def cli_main():
         # these two numbers should stay the same
         # how many times do we want to buy and sell a random stock
         # trade_cycle means, take position this many times
-        TRADE_CYCLE_DEFAULT = 300
-        TRADE_CYCLES = 300   
+        TRADE_CYCLE_DEFAULT = 150
+        TRADE_CYCLES = 150   
         
         # how many shares will we buy each round
         # TODO: propigate SHARE_QUANTITY to buy/sell checks after KILL_OR_FILL is added <>
@@ -304,12 +292,10 @@ async def cli_main():
         
         # report variables to the log
         def report_control_variables():
-            progress.w('(' + str(CASH_TO_SPEND) + ')_CASH_TO_SPEND')
-            progress.w('(' + str(CASH_AVAILABLE_THRESHOLD) + ')_CASH_AVAILABLE_THRESHOLD')
-            progress.w('(' + str(NUMBER_OF_STOCKS_IN_POOL) + ')_NUMBER_OF_STOCKS_IN_POOL')
-            progress.w('(' + str(CONSIDER_MARKET_CAP) + ')_CONSIDER_MARKET_CAP')
             progress.w('(' + str(VOLATILITY_TAIL) + ')_VOLATILITY_TAIL')
             progress.w('(' + str(VOLATILITY_THRESHOLD) + ')_VOLATILITY_THRESHOLD')
+            progress.w('(' + str(VOLATILITY_CUT) + ')_VOLATILITY_CUT')
+            progress.w('(' + str(NUMBER_OF_STOCKS_IN_POOL) + ')_NUMBER_OF_STOCKS_IN_POOL')
             progress.w('(' + str(STOCK_PRICE_LOW) + ')_STOCK_PRICE_LOW')
             progress.w('(' + str(STOCK_PRICE_HIGH) + ')_STOCK_PRICE_HIGH')
             progress.w('(' + str(len(ADD_THESE_STOCKS)) + ')_ADDING_THIS_COUNT')
@@ -370,12 +356,15 @@ async def cli_main():
         cash_available_for_trading = account_info['securitiesAccount']['currentBalances']['cashAvailableForTrading']
         progress.w('TDA_ACCOUNT_(CASH: ' + str(cash_available_for_trading) + ')')
         
-        # check if we have enough cash in our account
-        if cash_available_for_trading - CASH_TO_SPEND > CASH_AVAILABLE_THRESHOLD:
-            progress.s('CASH_CHECK_VERIFIED')
+        # do some math to see if we have enough money to trade
+        cash_math = Decimal(STOCK_PRICE_HIGH) * TRADE_CYCLE_DEFAULT * SHARE_QUANTITY
+        
+        # cash_math is a MAX value and does not exactly represent what will be spent
+        if cash_math < cash_available_for_trading:
+            progress.s('CASH_CHECK_VERIFIED_(' + str(cash_math) + ' < ' + str(cash_available_for_trading) + ')')
         else:
             progress.w('NOT_ENOUGH_CASH')
-            progress.slowly("You're trying to spend to much or the threshold is to high. Please Adjust.")
+            progress.slowly("You may run out of money. [STOCK_PRICE_HIGH] * [TRADE_CYCLE_DEFAULT] * [SHARE_QUANTITY].")
             progress.inputly('Press ENTER to EXIT')
             sys.exit()
 
@@ -393,6 +382,7 @@ async def cli_main():
             progress.s('GET_NASDAQ_SCREENER')
             
             # Use asof date to create aware datetime for NEW nasdaq screener
+            # This is the date of the screener, not the date of the pull
             asof_trimmed = nasdaq_screener_nowpull['data']['asof'].replace('Last price as of','').replace(',','').split()
             new_asof = dt.strptime(asof_trimmed[1] + ' ' + asof_trimmed[0] + ' ' + asof_trimmed[2], "%d %b %Y")
             ns_nowpull_aware_datetime = pytz.timezone('US/Eastern').localize(dt(new_asof.year, new_asof.month, new_asof.day, 20))
@@ -418,6 +408,7 @@ async def cli_main():
                                                      pool, 
                                                      v_tail, 
                                                      v_thresh, 
+                                                     v_cut,
                                                      price_l, 
                                                      price_h, 
                                                      add_ts, 
@@ -429,7 +420,7 @@ async def cli_main():
             
             # volatile stocks list
             volatile_stocks = []
-            
+
             # tuple the useful data (symbol, lastsale, netchange, marketCap)
             for symbol_data in tqdm(screener['data']['table']['rows']):
                 
@@ -455,7 +446,7 @@ async def cli_main():
                                 volatility_of_stock = 0.0 - float(symbol_data['netchange'])
 
                                 # top tail, abs, check thresh, 
-                                if v_tail == 'TOP' and volatility_of_stock < 0.0:
+                                if v_tail == 'POSITIVE' and volatility_of_stock < 0.0:
                                     volatility_of_stock = abs(volatility_of_stock)
                                     if volatility_of_stock > v_thresh:
                                         
@@ -466,7 +457,7 @@ async def cli_main():
                                         volatile_stocks.append(symbol_data_tuple)
                                         
                                 # bottom tail, check thresh
-                                elif v_tail == 'BOTTOM' and volatility_of_stock > 0.0:
+                                elif v_tail == 'NEGATIVE' and volatility_of_stock > 0.0:
                                     if float(volatility_of_stock) > v_thresh:
                                         
                                         # put symbol and volatility in a tuple
@@ -486,11 +477,26 @@ async def cli_main():
                 return symbol_only_list
             
             
+            
+########################################################################################################################################
+########################################################################################################################################           
+#################### UNTESTED, make sure this works before tomorrow ####################################################################
+########################################################################################################################################
+########################################################################################################################################
+            
             # current list has more than what we want NUMBER_OF_STOCKS_IN_POOL
             if len(volatile_stocks) > pool:
                 
-                # filter down to our number
-                # TODO: implement with code below <>
+                # filter down to our pool number
+                if v_cut == 'TOP':
+                    # remove using min (removes the lowest volatility, leaving the TOP)
+                    while len(volatile_stocks) > pool:
+                        volatile_stocks.remove(min(volatile_stocks, key=ret_2nd_ele))
+                    
+                elif v_cut == 'BOTTOM':
+                    # remove using max (removes the highest volatility, leaving the BOTTOM)
+                    while len(volatile_stocks) > pool:
+                        volatile_stocks.remove(max(volatile_stocks, key=ret_2nd_ele))
                 '''
                 pbar = tqdm(total=len(vol_data)-TOP_VOLUME_PREVIOUS_DAY)
                 while len(vol_data) > TOP_VOLUME_PREVIOUS_DAY:
@@ -518,6 +524,7 @@ async def cli_main():
                                                                    NUMBER_OF_STOCKS_IN_POOL,
                                                                    VOLATILITY_TAIL,
                                                                    VOLATILITY_THRESHOLD,
+                                                                   VOLATILITY_CUT,
                                                                    STOCK_PRICE_LOW,
                                                                    STOCK_PRICE_HIGH,
                                                                    ADD_THESE_STOCKS,
@@ -679,9 +686,14 @@ async def cli_main():
             progress.s('PLACING_AN_ORDER_(sell_random_(' + symbol_to_trade[0] + '))')
             progress.crit(sell_order_json['orderActivityCollection'][0]['executionLegs'][0]['price'])
             
-            # send profit to TRACE, just changed to Decimal, keep an eye on it.
-            progress.trace(Decimal(sell_order_json['orderActivityCollection'][0]['executionLegs'][0]['price']
-                                   ) - Decimal(buy_order_json['orderActivityCollection'][0]['executionLegs'][0]['price']))
+            # capture data for progress report
+            final_symbol = str(symbol_to_trade[0])
+            final_buy_price = str(buy_order_json['orderActivityCollection'][0]['executionLegs'][0]['price'])
+            final_sell_price = str(sell_order_json['orderActivityCollection'][0]['executionLegs'][0]['price'])
+            final_profit = str(Decimal(sell_order_json['orderActivityCollection'][0]['executionLegs'][0]['price']) - Decimal(buy_order_json['orderActivityCollection'][0]['executionLegs'][0]['price']))
+            
+            # progress report symbol, buy price, sell price, and profit to trace log
+            progress.trace(final_symbol + ' | ' + final_buy_price + ' | ' + final_sell_price + ' | ' + final_profit)
 
             ###########################################
             ########  SLEEP BEFORE BUY  ###############
