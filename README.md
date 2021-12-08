@@ -84,3 +84,7 @@ Automatic Retail Trader for TD Ameritrade (future version)
   - under the hood, every one second it asks tda about the order status, and after STOP_TRYING_TO_BUY is reached, it will cancel
   - this setting may go away once functionality for more shares is added and fill_or_kill is used
   - NOTE that this only pertains to the buy order. The sell order will cycle indefinetly until the order is filled.
+
+- Contact/Support me:
+  - https://www.twitch.tv/peacelaced (I sometimes like streaming.)
+  - https://www.patreon.com/peacelaced (I sometimes like money.)
