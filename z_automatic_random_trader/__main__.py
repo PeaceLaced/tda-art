@@ -240,31 +240,36 @@ async def cli_main():
         ####  STOCK SELECT VARIABLES    ####
         #### -------------------------- ####
         ####################################
+        
+        # only select stocks between these two price points, in dollars
+        STOCK_PRICE_LOW = 2.00
+        STOCK_PRICE_HIGH = 5.00
        
+        #################################################################
+        #### PLEASE NOTE:   volatility in this script is simply      ####
+        ####                a change in price between                ####
+        ####                the day before yesterday and yesterday   ####
+        #################################################################
+        
         # POSITIVE or NEGATIVE, VOLATILITY_TAIL is volatility in that direction
         VOLATILITY_TAIL = 'POSITIVE'
         
-        # VOLATILITY_THRESHOLD gives you volatility that is greater than your numbrer
+        # VOLATILITY_THRESHOLD gives you volatility that is greater than your number, in dollars
         VOLATILITY_THRESHOLD = 0.1
         
-        # TOP or BOTTOM, VOLATILITY_CUT gives you higher(top) or lower(bottom) volatility within your tail
+        # After tail and threshold, CUT isolates based on POOL
+        # TOP, BOTTOM or CENTER, top is highest, bottom is lowest, center removes top and bottom
         VOLATILITY_CUT = 'BOTTOM'
         
         # how many stocks do you want in the pool to randomly pick from
-        # TODO: add this next <>
-        NUMBER_OF_STOCKS_IN_POOL = 500
-
-        # only select stocks between these two price points
-        STOCK_PRICE_LOW = 2.00
-        STOCK_PRICE_HIGH = 5.00
+        NUMBER_OF_STOCKS_IN_POOL = 75
         
-        # manually add stocks to the pick list
-        # TODO: not implemented yet <>
+        # add or remove stocks manually (read as always/never trade)
+        # calculated AFTER pool is established.
         ADD_THESE_STOCKS = []
-        
-        # filter out these stocks from the pick list
-        # TODO: not implemented yet <>
         AVOID_THESE_STOCKS = []
+        
+        # TODO: add an inline feature that reads from a file every cycle to add/avoid symbols<>
         
         ####################################
         ####  STOCK TRADE VARIABLES     ####
@@ -274,8 +279,8 @@ async def cli_main():
         # these two numbers should stay the same
         # how many times do we want to buy and sell a random stock
         # trade_cycle means, take position this many times
-        TRADE_CYCLE_DEFAULT = 150
-        TRADE_CYCLES = 150   
+        TRADE_CYCLE_DEFAULT = 300
+        TRADE_CYCLES = 300   
         
         # how many shares will we buy each round
         # TODO: propigate SHARE_QUANTITY to buy/sell checks after KILL_OR_FILL is added <>
@@ -292,14 +297,16 @@ async def cli_main():
         
         # report variables to the log
         def report_control_variables():
+            progress.w('(' + str(STOCK_PRICE_LOW) + ')_STOCK_PRICE_LOW')
+            progress.w('(' + str(STOCK_PRICE_HIGH) + ')_STOCK_PRICE_HIGH')
+            
             progress.w('(' + str(VOLATILITY_TAIL) + ')_VOLATILITY_TAIL')
             progress.w('(' + str(VOLATILITY_THRESHOLD) + ')_VOLATILITY_THRESHOLD')
             progress.w('(' + str(VOLATILITY_CUT) + ')_VOLATILITY_CUT')
             progress.w('(' + str(NUMBER_OF_STOCKS_IN_POOL) + ')_NUMBER_OF_STOCKS_IN_POOL')
-            progress.w('(' + str(STOCK_PRICE_LOW) + ')_STOCK_PRICE_LOW')
-            progress.w('(' + str(STOCK_PRICE_HIGH) + ')_STOCK_PRICE_HIGH')
             progress.w('(' + str(len(ADD_THESE_STOCKS)) + ')_ADDING_THIS_COUNT')
             progress.w('(' + str(len(AVOID_THESE_STOCKS)) + ')_REMOVING_THIS_COUNT')
+            
             progress.w('(' + str(TRADE_CYCLE_DEFAULT) + ')_TRADE_CYCLE_DEFAULT')
             progress.w('(' + str(TRADE_CYCLES) + ')_TRADE_CYCLES')
             progress.w('(' + str(SHARE_QUANTITY) + ')_SHARE_QUANTITY')
@@ -400,24 +407,21 @@ async def cli_main():
         ####   ---------------------    ####
         ####################################
         
-        # NASDAQ_SCREENER_DATA, NUMBER_OF_STOCKS_IN_POOL
-        # VOLATILITY_TAIL, VOLATILITY_THRESHOLD
-        # STOCK_PRICE_LOW, STOCK_PRICE_HIGH
-        # ADD_THESE_STOCKS, AVOID_THESE_STOCKS
+        # nasdaq_screener_data
+        # NUMBER_OF_STOCKS_IN_POOL
+        # VOLATILITY_TAIL
+        # VOLATILITY_THRESHOLD
+        # VOLATILITY_CUT
+        # STOCK_PRICE_LOW
+        # STOCK_PRICE_HIGH
         def get_high_volatility_stocks_price_limited(screener, 
                                                      pool, 
                                                      v_tail, 
                                                      v_thresh, 
                                                      v_cut,
                                                      price_l, 
-                                                     price_h, 
-                                                     add_ts, 
-                                                     avoid_ts):
-            
-            # used to remove low volatility stocks
-            def ret_2nd_ele(tuple_1):
-                return tuple_1[1]
-            
+                                                     price_h):
+
             # volatile stocks list
             volatile_stocks = []
 
@@ -475,48 +479,101 @@ async def cli_main():
                     
                 # return the list of symbols only    
                 return symbol_only_list
-            
-            
-            
-########################################################################################################################################
-########################################################################################################################################           
-#################### UNTESTED, make sure this works before tomorrow ####################################################################
-########################################################################################################################################
-########################################################################################################################################
-            
-            # current list has more than what we want NUMBER_OF_STOCKS_IN_POOL
+                 
+            # used to remove low volatility stocks
+            def ret_2nd_ele(tuple_1):
+                return tuple_1[1]
+
+            # after filtering by price, tail, and volatility threshold
+            # select the top, bottom or center based on POOL
+            # TODO: Clean this whole thing up to remove duplication <>
             if len(volatile_stocks) > pool:
                 
-                # filter down to our pool number
+                # remove using min (removes the lowest volatility, leaving the TOP)
                 if v_cut == 'TOP':
-                    # remove using min (removes the lowest volatility, leaving the TOP)
-                    while len(volatile_stocks) > pool:
+                    while len(volatile_stocks) != pool:
                         volatile_stocks.remove(min(volatile_stocks, key=ret_2nd_ele))
-                    
+                        if len(volatile_stocks) == pool:
+                            break
+                
+                # remove using max (removes the highest volatility, leaving the BOTTOM)
                 elif v_cut == 'BOTTOM':
-                    # remove using max (removes the highest volatility, leaving the BOTTOM)
-                    while len(volatile_stocks) > pool:
+                    while len(volatile_stocks) != pool:
                         volatile_stocks.remove(max(volatile_stocks, key=ret_2nd_ele))
-                '''
-                pbar = tqdm(total=len(vol_data)-TOP_VOLUME_PREVIOUS_DAY)
-                while len(vol_data) > TOP_VOLUME_PREVIOUS_DAY:
-                    pbar.set_description('REMOVING_LOW_VOLUME')
-                    vol_data.remove(min(vol_data, key=ret_2nd_ele))
-                    pbar.update(1)
-                pbar.close()
-                progress.s('REMOVED_LOWEST_VOLUME_SYMBOLS')
-                '''
-            
+                        if len(volatile_stocks) == pool:
+                            break
+                        
+                # remove the top and bottom of the highest volatility, leaving the center
+                elif v_cut == 'CENTER':
+                    
+                    # figure out if what we want and what we got is even or odd
+                    if NUMBER_OF_STOCKS_IN_POOL % 2 == 0 and len(volatile_stocks) % 2 == 0:
+                        
+                        # these are even, even, just take one from each side
+                        progress.i('EVEN_EVEN')
+                        while len(volatile_stocks) != pool:
+                            volatile_stocks.remove(min(volatile_stocks, key=ret_2nd_ele))
+                            volatile_stocks.remove(max(volatile_stocks, key=ret_2nd_ele))
+                            if len(volatile_stocks) == pool:
+                                break
+                        
+                    elif NUMBER_OF_STOCKS_IN_POOL % 2 == 0 and len(volatile_stocks) % 2 == 1:
+                        
+                        #these are even, odd, remove one bottom, then take one from each side
+                        progress.i('EVEN_ODD')
+                        volatile_stocks.remove(min(volatile_stocks, key=ret_2nd_ele))
+                        while len(volatile_stocks) != pool:
+                            volatile_stocks.remove(min(volatile_stocks, key=ret_2nd_ele))
+                            volatile_stocks.remove(max(volatile_stocks, key=ret_2nd_ele))
+                            if len(volatile_stocks) == pool:
+                                break
+                        
+                    elif NUMBER_OF_STOCKS_IN_POOL % 2 == 1 and len(volatile_stocks) % 2 == 1:
+                        
+                        # these are odd, odd, just take one from each side
+                        progress.i('ODD_ODD')
+                        while len(volatile_stocks) != pool:
+                            volatile_stocks.remove(min(volatile_stocks, key=ret_2nd_ele))
+                            volatile_stocks.remove(max(volatile_stocks, key=ret_2nd_ele))
+                            if len(volatile_stocks) == pool:
+                                break
+                            
+                    elif NUMBER_OF_STOCKS_IN_POOL % 2 == 1 and len(volatile_stocks) % 2 == 0:
+                        
+                        # these are odd even, take one from bottom then remove each side
+                        progress.i('ODD_EVEN')
+                        volatile_stocks.remove(min(volatile_stocks, key=ret_2nd_ele))
+                        while len(volatile_stocks) != pool:
+                            volatile_stocks.remove(min(volatile_stocks, key=ret_2nd_ele))
+                            volatile_stocks.remove(max(volatile_stocks, key=ret_2nd_ele))
+                            if len(volatile_stocks) == pool:
+                                break
+                
+                # after breaking out, verify what we have is what we want
+                volatility_low_point = min(volatile_stocks, key=ret_2nd_ele)
+                volatility_high_point = max(volatile_stocks, key=ret_2nd_ele)
+                progress.w('VOLATILITY_IS_BETWEEN_(' + str(volatility_low_point[1]) + ' and ' + str(volatility_high_point[1]) + ')')
+                progress.slowly('Stocks to trade are between these two volatility points: ' + str(volatility_low_point[1]) + ' and ' + str(volatility_high_point[1]))
+                answer = input('Type YES to use what we have or NO to EXIT. YES or NO: ')
+                if answer == 'YES':
+                    progress.w('(' + answer + ')_CONTINUING')
+                    return extract_symbols(volatile_stocks)
+                else:
+                    progress.w('(' + answer + ')_EXITING')
+                    sys.exit()
+                                          
             # report that we have less than what we wanted    
             else:
                 progress.w('COUNT:(' + str(len(volatile_stocks)) + ')_NOT_ENOUGH_STOCKS_IN_LIST')
                 progress.slowly('The list we have is less than what we want.')
                 answer = input('Type YES to use what we have or NO to EXIT. YES or NO: ')
                 if answer == 'YES':
+                    progress.w('(' + answer + ')_CONTINUING')
                     return extract_symbols(volatile_stocks)
                 else:
                     progress.w('(' + answer + ')_EXITING')
                     sys.exit()
+            
 
         
         # run the filter function and get our stock list
@@ -526,11 +583,18 @@ async def cli_main():
                                                                    VOLATILITY_THRESHOLD,
                                                                    VOLATILITY_CUT,
                                                                    STOCK_PRICE_LOW,
-                                                                   STOCK_PRICE_HIGH,
-                                                                   ADD_THESE_STOCKS,
-                                                                   AVOID_THESE_STOCKS,
+                                                                   STOCK_PRICE_HIGH
                                                                    )
         
+        # push ADD and AVOID to the list before we start trading
+        # this adds or takes away from total POOL
+        if len(ADD_THESE_STOCKS) > 0:
+            for add_symbol in ADD_THESE_STOCKS:
+                stocks_to_trade.append(add_symbol)
+        if len(AVOID_THESE_STOCKS) > 0:        
+            for remove_symbol in AVOID_THESE_STOCKS:
+                stocks_to_trade.remove(remove_symbol)
+                
         ###########################################
         ########  MAIN CASH ACCOUNT LOOP  #########
         ###########################################  
