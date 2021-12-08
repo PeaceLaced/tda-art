@@ -1,5 +1,7 @@
 # tda-art
+
 Automatic Random Trader for TD Ameritrade (current version)
+
 Automatic Retail Trader for TD Ameritrade (future version)
 
 - requirements: TDA-API, loguru, tqdm
