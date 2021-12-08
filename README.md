@@ -11,7 +11,7 @@ Automatic Retail Trader for TD Ameritrade (future version)
 - This is essentially a symbol selection script with trade functionality.
 
 - This may NOT work on the cloud (Nasdaq sometimes blocks access)
-- This should always work locally, but be aware each run pulls from Nasdaq.
+  - This should always work locally, but be aware each run pulls from Nasdaq.
 
 - This script does NOT use or need a database.
 - This script logs to a few different files, but can easily be converted to DB if you like.
