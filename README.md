@@ -20,7 +20,7 @@ Automatic Retail Trader for TD Ameritrade (future version)
   - These two methods are intended for LONG non LIMIT orders.
   - If you want LIMIT or SHORT, make the changes, but be warned, I have NOT used it in this way.
 
-- This script currently only works during normal market hours. 
+- This script ONLY works during normal market hours. 
   - It is easy to add pre and post market functionality, but I have no interest in trading those hours, so I will not add it.
   - SEE: https://tda-api.readthedocs.io/en/latest/order-builder.html#order-builder
   - SEE: https://tda-api.readthedocs.io/en/latest/order-builder.html#tda.orders.common.Session
