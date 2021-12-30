@@ -24,7 +24,7 @@ import asyncio
 
 from z_art.progress_report.config_progress_report import Progress as progress
 
-progress.w('IDENTIFY_SCRIPT_(run_automatic_random_trader.py)')
+progress.w('IDENTIFY_SCRIPT_(run_algorithmic_retail_trader.py)')
 
 opts = [opt for opt in sys.argv[1:] if opt.startswith("-")]
 
