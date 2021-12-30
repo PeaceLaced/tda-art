@@ -15,4 +15,5 @@ Algorithmic Retail Trader for TD Ameritrade
         - MetaMask: 0x567ec43065991e4269Be19F4aEcac8C93c587619
     
 @author: Brandon Black (PeaceLaced)
+
 @source: https://github.com/PeaceLaced/tda-art
