@@ -1,5 +1,5 @@
 """
-- (main_strat_baseline.py)
+- (main_strat_tripplewin.py)
 
 """
 
@@ -20,18 +20,18 @@ from z_art.strategy_select.api_strat_select import order_place_equity_market
 # set decimal context, precision = 9, rounding = round half even
 setcontext(BasicContext)
 
-class BaselineStratTypeException(TypeError):
+class TrippleWinStratTypeException(TypeError):
     '''Raised when there is a type error in :meth:`run_random_strat`.'''
     
-class BaselineStratValueException(ValueError):
+class TrippleWinStratValueException(ValueError):
     '''Raised when there is a value error in :meth:`run_random_strat`.'''
     
-def run_strat_baseline(tda_client, stocks_to_trade):
+def run_strat_tripplewin(tda_client, stocks_to_trade):
     '''
-    Trade the BASELINE (aka: TEMPLATE) strat by defining constants below.
-    - The BASELINE strat buys and sells through three cycles, removing losers
+    Trade the TRIPPLEWIN strat by defining constants below.
+    - The TRIPPLEWIN strat buys and sells through three cycles, removing losers
       and zero profit symbols. Then it trades the remaining stocks by buying,
-      holding, selling and repeating.
+      holding, selling, and repeating.
     - CAUTION: this strat never wins
 
     :param tda_client: The client object created by tda-api.
@@ -42,10 +42,13 @@ def run_strat_baseline(tda_client, stocks_to_trade):
     :meth parse_order: returns a json of the order after getting the order id
 
     '''
-    if not isinstance(tda_client, synchronous.Client):
-        raise BaselineStratTypeException('tda client object is required')
-    # bring in stream to make more intelligent trades
     
+    if not isinstance(tda_client, synchronous.Client):
+        raise TrippleWinStratTypeException('tda client object is required')
+        
+    if not isinstance(stocks_to_trade, list):
+        raise TrippleWinStratTypeException('stocks_to_trade must be a list')
+        
     # modify these constants
     MINUTES_TO_RUN = 330
     HARDCODED_TEST_SHARES = 1
@@ -55,7 +58,7 @@ def run_strat_baseline(tda_client, stocks_to_trade):
     TRIPPLE_WIN_MOD = 60
 
     config_variables = [MINUTES_TO_RUN, HARDCODED_TEST_SHARES, TRIPPLE_WIN_SHARES, STOP_TRYING_TO_BUY, HOLD_STOCK_THIS_LONG, TRIPPLE_WIN_MOD]
-    report_config('strat_baseline', config_variables, report_config=True)
+    report_config('strat_tripplewin', config_variables, report_config=True)
 
     # setup some lists and variables to use throughout the strategy
     losers_removed = []
