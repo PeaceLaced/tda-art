@@ -1,25 +1,25 @@
 """
-- Set the STRATEGY in this file.
+- Set the STRATEGY.
 
 """
-
 import sys
 import time
-
 from z_art.strategy_select.main_strat_select import load_strat
 from z_art.symbol_select.main_symbol_select import get_symbols
-from z_art.progress_report.config_progress_report import Progress as progress
-from z_art.td_ameritrade.main_td_ameritrade import get_client_session, get_my_balance
+
+# slowly converting everyting to the new API
+from z_art.progress_report.api_progress_report import Progress as progress
+from z_art.td_ameritrade.api_td_ameritrade import get_client_session, get_my_balance
 
 async def cli_main():
     '''
-    Main application logic, more later.
+    Main application logic, set strat here.
     
     '''
     try:
         
-        # pick a strat (RANDOM or BASELINE)
-        strat = 'BASELINE'
+        # pick a strat (RANDOM, TRIPPLEWIN, BASELINE)
+        strat = 'TRIPPLEWIN'
         
         # create a performance counter
         s = time.perf_counter()
@@ -29,13 +29,13 @@ async def cli_main():
         
         # create a tda-api client session
         tda_client = get_client_session()
-           
+
         # get TD Ameritrade account details
         get_my_balance(tda_client)
         
         # select the symbols we want to trade
-        stocks_to_trade = get_symbols()
-        
+        stocks_to_trade = get_symbols(tda_client)
+
         # load and run the strat
         load_strat(strat, tda_client, stocks_to_trade)
         
@@ -50,7 +50,7 @@ async def cli_main():
         
         # report keyboard interrupt shutdown
         progress.w('APPLICATION_SHUTDOWN_(KBInterrupt)')
-        
+      
     except Exception as err:
         
         # report exception thrown and exit

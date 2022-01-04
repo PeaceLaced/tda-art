@@ -10,15 +10,14 @@ from tda.utils import Utils
 from tda.client import synchronous
 from decimal import Decimal, setcontext, BasicContext
 from tda.orders.equities import equity_buy_market, equity_sell_market
-from z_art.td_ameritrade.config_td_ameritrade import ACCOUNT_ID
-from z_art.progress_report.config_progress_report import Progress as progress
+from z_art.td_ameritrade.api_td_ameritrade import ACCOUNT_ID
+
+# slowly converting everyting to the new API
+from z_art.progress_report.api_progress_report import Progress as progress
+from z_art.td_ameritrade.api_td_ameritrade import throttle
 
 # set decimal context, precision = 9, rounding = round half even
 setcontext(BasicContext)
-
-def throttle(sleep_time):
-    '''Used to throttle certain endpoint calls'''
-    sleep(sleep_time)
 
 class OrderType(Enum):
     '''Used when placing orders and in other logic for standardization.'''
@@ -26,37 +25,17 @@ class OrderType(Enum):
     SELL = 'SELL'
     PROFIT = 'PROFIT'
 
-# TODO: standardize these excpetions
-class ClientObjectException(TypeError):
-    '''Raised by methods that fail to supply an authenticated tda-api client to function.'''
-
-class OrderTypeException(TypeError):
-    '''Raised by methods where order type should be of type :class:`OrderType`.'''
-
-class OrderResponseException(ValueError):
-    '''
-    Raised by methods where an order response is expected.
-    In some cases an order id is acceptable (:meth:`get_order_details`)
-    '''
-
-class ShareQuantityException(ValueError):
-    '''Raised by methods where :value:`share_quantity` is NOT :type:`int`.'''
-
-class WaitForFillException(ValueError):
-    '''Raised by methods when :value:`wait_for_fill` is NOT :bool:`True`, :bool:`False`, or :type:`int`.'''
-
-class OrderReportTypeException(TypeError):
-    '''Raised by :meth:`_order_report` when :type:`dict` or :type:`httpx.Response` is not passed.'''
-
-class OrderReportValueException(ValueError):
-    '''Raised by :meth:`_order_report` when missing :value:`type`, :value:`symbol`, or :value:`shares`.'''
-
+class StratSelectTypeException(TypeError):
+    '''Raised when there is a type error in :file:`api_strat_select`.'''
+    
+class StratSelectValueException(ValueError):
+    '''Raised when there is a value error in :file:`api_strat_select`.'''
+    
 class DataSyndicateTypeException(TypeError):
-    '''Raised by :meth:`data_syncidate` when data_point is NOT of :type:`dict`.'''
+    '''Raised when there is a type error in :meth:`data_syndicate`'''
 
 def _order_report(order_data, order_type=False, order_symbol=False, order_shares=False):
     '''Used by methods that set order_report=True
-       NOTE: This is NOT error reporting, this is for reporting orders.
 
     :param order_data: can be order_json (`order_get_details`)
                        or an order_response (`order_place_equity_market`)
@@ -65,16 +44,7 @@ def _order_report(order_data, order_type=False, order_symbol=False, order_shares
     :param order_shares: default is False, REQUIRED when order_data is httpx.Response
     '''
     if not isinstance(order_data, (dict, httpx.Response)):
-        raise OrderReportTypeException('order_data should be an order_json dict or httpx.Reponse object')
-    
-    if isinstance(order_data, httpx.Response):
-        # type checked in `order_place_equity_market, just make sure they are passed
-        if not order_type:
-            raise OrderReportValueException('passing order_response requires order_type to be set')
-        if not order_symbol:
-            raise OrderReportValueException('passing order_response requires order_symbol to be set')
-        if not order_shares:
-            raise OrderReportValueException('passing order_response requires order_shares to be set')
+        raise StratSelectTypeException('order_data should be an order_json dict or httpx.Reponse object')
     
     if isinstance(order_data, dict):
         order_type = str(order_data['orderLegCollection'][0]['instruction'])
@@ -86,13 +56,25 @@ def _order_report(order_data, order_type=False, order_symbol=False, order_shares
         if int(order_data['quantity']) != int(order_data['filledQuantity']):
             #WAITING_FOR_FILL_(BUY_(AAPL, 25))
             progress.w('WAITING_FOR_FILL_(' + order_type + '_(' + order_symbol + ', ' + order_shares +'))')
-            
+    
+##### TODO: this is a duplicate, it is being handled twice, keep for now (3Jan2022) <>
     if isinstance(order_data, httpx.Response):
+        
+        if not order_type:
+            raise StratSelectValueException('passing order_response requires order_type to be set')
+        if not isinstance(order_type, OrderType):
+            raise StratSelectTypeException('order_type must be of type OrderType')
         if isinstance(order_type, OrderType.BUY):
-            order_type = 'BUY'
+            order_type = OrderType.BUY.value
         if isinstance(order_type, OrderType.SELL):
-            order_type = 'SELL'
-######### TODO: do we need to isinstance these? Maybe just typecast and report
+            order_type = OrderType.SELL.value
+            
+        if not order_symbol:
+            raise StratSelectValueException('passing order_response requires order_symbol to be set')
+            
+        if not order_shares:
+            raise StratSelectValueException('passing order_response requires order_shares to be set')
+            
         if isinstance(order_symbol, str):
             order_symbol = order_symbol
         if isinstance(order_shares, int):
@@ -105,9 +87,7 @@ def order_get_details(tda_client, order_response, wait_for_fill=False, order_rep
 ##### TODO: think about using a tuple for wait_for_fill (sec_to_wait, sec_between_wait)
     ''' Get the detials of an order
 
-    :param `tda_client`: The client object created by tda-api.
-                       SEE: :method: get_client_session in
-                       td_ameritrade/main_client_session.py
+    :param tda_client: The client object created by tda-api.
     :param `order_response`: The response object from a TDA order.
                            An order ID may also be passed.
     :param `wait_for_fill`: default is False, wait `int` seconds before canceling the order.
@@ -118,10 +98,10 @@ def order_get_details(tda_client, order_response, wait_for_fill=False, order_rep
                                  and dumps raw json to DEBUG
     '''
     if not isinstance(tda_client, synchronous.Client):
-        raise ClientObjectException('tda client object required to get order details')
+        raise StratSelectTypeException('tda client object required to get order details')
     
     if order_response is None:
-        raise OrderResponseException('at least one, an order response or ID, must be passed')
+        raise StratSelectValueException('at least one, an order response or ID, must be passed')
         
     if isinstance(order_response, httpx.Response):
         order_response = Utils(tda_client, int(ACCOUNT_ID)).extract_order_id(order_response)
@@ -136,10 +116,10 @@ def order_get_details(tda_client, order_response, wait_for_fill=False, order_rep
         
     if wait_for_fill: # everything but False
         if not isinstance(wait_for_fill, int): # cap non True/int
-            raise WaitForFillException('wait for fill must be False, True, or an int')
+            raise StratSelectTypeException('wait for fill must be False, True, or an int')
         else: # True and int
             cycle_count = 0
-############################ION: not seeing any WAIT_FOR_FILL reports
+
             while int(order_json['quantity']) != int(order_json['filledQuantity']):
                 if cycle_count < wait_for_fill:
                     if order_report:
@@ -152,7 +132,7 @@ def order_get_details(tda_client, order_response, wait_for_fill=False, order_rep
                         pass # wait for fill indefinetly (useful mostly when selling)
                 else:
                     try:
-######################### TODO: think about how to handle symbols that do not fill, possible removal
+######################### TODO: think about how to handle symbols that do not fill, possible removal, see remove_symbol()
                         order_response = tda_client.cancel_order(order_json['orderId'], int(ACCOUNT_ID))
                         order_json = order_response.json()
                     except Exception as err:
@@ -174,8 +154,6 @@ def order_place_equity_market(tda_client, order_type, order_symbol, order_shares
     ''' Place an equity market order, either buy or sell.
 
     :param tda_client: The client object created by tda-api.
-                       SEE: :method: get_client_session in
-                       td_ameritrade/main_client_session.py
     :param order_type: BUY or SELL
     :param order_symbol: the symbol to buy or sell
     :param order_shares: share quantity to buy or sell
@@ -184,13 +162,13 @@ def order_place_equity_market(tda_client, order_type, order_symbol, order_shares
     :return: order_response, to extract order details USE :meth:`order_get_details` 
     '''
     if not isinstance(tda_client, synchronous.Client):
-        raise ClientObjectException('tda_client object required to place an order')
+        raise StratSelectTypeException('tda_client object required to place an order')
         
     if not isinstance(order_type, OrderType):
-        raise OrderTypeException('order type must be OrderType.BUY/OrderType.SELL')
+        raise StratSelectTypeException('order type must be OrderType.BUY/OrderType.SELL')
        
     if not isinstance(order_shares, int) or order_shares < 1:
-        raise ShareQuantityException('order shares must be an int that is greater than zero')
+        raise StratSelectValueException('order shares must be an int that is greater than zero')
     
     if isinstance(order_type, OrderType) and order_type == OrderType.BUY:
         order_response = tda_client.place_order(int(ACCOUNT_ID), equity_buy_market(order_symbol, order_shares))
@@ -199,7 +177,7 @@ def order_place_equity_market(tda_client, order_type, order_symbol, order_shares
         order_response = tda_client.place_order(int(ACCOUNT_ID), equity_sell_market(order_symbol, order_shares))
      
     if isinstance(order_response, httpx.Response):
-        if order_response.status_code not in [200, 201, 202]:
+        if order_response.status_code not in {200, 201, 202}:
             progress.e((order_response.status_code, order_response))
         elif order_report:
             _order_report(order_response, order_type, order_symbol, order_shares)
@@ -278,11 +256,8 @@ def data_syndicate(data_point, report_data=False, report_lists=False, report_pro
                         profit = Decimal(sell_item[2]) - Decimal(buy_item[2])
                         profit_list.append((sell_item[1], str(profit)))
                         if report_profit:
-                            progress.trace('PROFIT | ' + str(sell_item[1]) + ' | ' + str(profit) + ' | ')
-            if report_lists:
-                progress.e(buy_list)
-                progress.e(sell_list)
-                progress.e(profit_list)
+                            progress.trace(OrderType.PROFIT.value + ' | ' + str(sell_item[1]) + ' | ' + str(profit) + ' | ')
+            # removed list reporting to progress.e (3Jan2022)
             if not return_profit:
                 buy_list.clear()
                 sell_list.clear()
@@ -298,14 +273,5 @@ def data_syndicate(data_point, report_data=False, report_lists=False, report_pro
 def remove_symbol():
     '''we need something that removes symbols from the main symbol list
     '''
-    
-def report_config(config_file, config_variables, log_select='WARNING', report_config=False):
-    '''takes a list of variables from the config file, reports them to the log
-    
-    :param config_file: file name string
-    :param config_variables: list of variables from a config file to report
-    :param log_select: default is WARNING log. Any progress report log is valid.
-    '''
-##### TODO: add 'raise exception' and log select functionality
-    for c_variable in config_variables:
-        progress.w('(' + str(config_file) + ')_(' + str(c_variable) + ')')
+##### TODO: need to work on this soon, remove problem symbols from the main symbol list <>    
+    pass

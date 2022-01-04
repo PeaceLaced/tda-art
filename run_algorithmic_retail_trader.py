@@ -22,7 +22,7 @@ Created on Sat 27 Nov 03:42:45 2021
 import sys
 import asyncio
 
-from z_art.progress_report.config_progress_report import Progress as progress
+from z_art.progress_report.api_progress_report import Progress as progress
 
 progress.w('IDENTIFY_SCRIPT_(run_algorithmic_retail_trader.py)')
 
