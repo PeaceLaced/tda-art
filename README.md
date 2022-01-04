@@ -37,8 +37,9 @@
        - for help with this, visit [tda-api discord](https://discord.gg/BEr6y6Xqyv)
 2) **configure the application**
    - set the [strategy](https://github.com/PeaceLaced/tda-art/blob/main/z_art/__main__.py)
-   - set strategy settings
-       - RANDOM [strategy settings](https://github.com/PeaceLaced/tda-art/blob/main/z_art/strategy_select/strat_random/config_strat_random.py)
-       - BASELINE [strategy settings](https://github.com/PeaceLaced/tda-art/blob/main/z_art/strategy_select/strat_baseline/config_strat_baseline.py)
-   - set [symbol select settings](https://github.com/PeaceLaced/tda-art/blob/main/z_art/symbol_select/config_symbol_select.py)
+   - configure strategy constants
+       - RANDOM [strategy settings](https://github.com/PeaceLaced/tda-art/blob/main/z_art/strategy_select/strat_random/main_strat_random.py)
+       - TRIPPLEWIN [strategy settings](https://github.com/PeaceLaced/tda-art/blob/main/z_art/strategy_select/strat_tripplewin/main_strat_tripplewin.py)
+       - BASELINE (or use this template to build your own strategy)
+   - set [symbol select params](https://github.com/PeaceLaced/tda-art/blob/main/z_art/symbol_select/main_symbol_select.py)
 3) **start the** [run script](https://github.com/PeaceLaced/tda-art/blob/main/run_algorithmic_retail_trader.py) **from the CLI**
