@@ -18,7 +18,7 @@
 - Brandon Black (PeaceLaced)
 </p></details>
 
-<details><summary>SUPPORT</summary>
+<details><summary>SUPPORT ME</summary>
 <p>
 
 - https://www.twitch.tv/peacelaced
