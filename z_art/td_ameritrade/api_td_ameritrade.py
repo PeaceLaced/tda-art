@@ -25,7 +25,7 @@ def throttle(sleep_time):
     '''
     
     if not isinstance(sleep_time, float):
-        raise TDAmeritradeTypeException('sleep_time must be an int')
+        raise TDAmeritradeTypeException('sleep_time must be an float')
         
     sleep(sleep_time)
     
@@ -56,7 +56,7 @@ def get_client_session():
         progress.w('TDA_TOKEN_(not_found)')
         from selenium import webdriver
         from tda.auth import client_from_login_flow
-        from .config import REDIRECT_URI
+        from z_art.td_ameritrade.config_td_ameritrade import REDIRECT_URI
         
         progress.i('TDA_TOKEN_(create)')
         with webdriver.Firefox() as DRIVER:
