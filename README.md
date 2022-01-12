@@ -10,6 +10,8 @@
 
 - for educational purposes only
 - not financial advice
+- this software is provided as-is
+
 </p></details>
 
 <details><summary>AUTHOR</summary>
