@@ -24,7 +24,7 @@ def throttle(sleep_time):
     :return: None
     '''
     
-    if not isinstance(sleep_time, int):
+    if not isinstance(sleep_time, float):
         raise TDAmeritradeTypeException('sleep_time must be an int')
         
     sleep(sleep_time)

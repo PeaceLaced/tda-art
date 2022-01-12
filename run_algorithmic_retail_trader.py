@@ -22,24 +22,17 @@ Created on Sat 27 Nov 03:42:45 2021
 import sys
 import asyncio
 
-from z_art.progress_report.api_progress_report import Progress as progress
 
-progress.w('IDENTIFY_SCRIPT_(run_algorithmic_retail_trader.py)')
 
 opts = [opt for opt in sys.argv[1:] if opt.startswith("-")]
 
-if "-gui" in opts:
+if "-chart" in opts:
     
-    # import gui app (does NOT exist)
-    from z_art.app_gui import gui_main
-    
-    # call the main gui function (does NOT exist)
-    gui_main()
+    # for now this runs a dash chart, future, crate more opts
+    import z_art.data_visual.app
     
 else:
-    
-    # import the main cli function from __main__
+    from z_art.progress_report.api_progress_report import Progress as progress
+    progress.w('IDENTIFY_SCRIPT_(run_algorithmic_retail_trader.py)')
     from z_art.__main__ import cli_main
-    
-    # call the main function with asyncio capability
     asyncio.run(cli_main())

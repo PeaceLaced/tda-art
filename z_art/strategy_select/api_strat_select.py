@@ -268,7 +268,7 @@ def data_syndicate(data_point, report_data=False, report_lists=False, report_pro
                 buy_list.clear()
                 sell_list.clear()
                 profit_list.clear()
-                return temp_profit_list
+                return temp_profit_list # returned as a list of tuples (symbol, profit)
 
 def remove_symbol():
     '''we need something that removes symbols from the main symbol list

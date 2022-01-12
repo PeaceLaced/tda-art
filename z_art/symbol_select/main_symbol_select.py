@@ -15,13 +15,12 @@ def get_symbols(tda_client):
                                          :meth:`final_symbol_filter` is required for 
                                                                      a symbol only list
     NOTICE: :meth:`filter_by_volume` should be called after all other methods
-                                     but before :meth:`final_count_filter` 
+                                     but before :meth:`final_symbol_filter` 
                                      because it connects to TDA at 0.5 seconds
                                      per symbol. Less symbols = Less time.
     
     :param tda_client: The client object created by tda-api.
                        Required, even if not using :meth:`filter_by_top_volume`
-    :param symbol_count: the number of symbols to trade
     
     return: a list of symbols based on whatever filter functions are called
     '''
@@ -32,7 +31,7 @@ def get_symbols(tda_client):
     
     symbol_list = api.filter_by_price(symbol_list, 2.00, 7.00)
     
-    symbol_list = api.filter_by_netchange(symbol_list, 'POSITIVE', 0.5)
+    symbol_list = api.filter_by_netchange(symbol_list, 'POSITIVE', 0.04) # min net change
     
     symbol_list = api.filter_by_top_marketcap(symbol_list, 50000000) # 50 Million
     
@@ -40,6 +39,6 @@ def get_symbols(tda_client):
     
     ADD_AVOID = ([], ['ARDS', 'TUYA', 'ARMP'])
     
-    symbol_list = api.final_symbol_filter(symbol_list, add_avoid=ADD_AVOID, strip_data=False)
+    symbol_list = api.final_symbol_filter(symbol_list, add_avoid=ADD_AVOID, strip_data=True)
     
     return symbol_list
