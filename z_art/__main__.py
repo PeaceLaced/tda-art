@@ -19,7 +19,7 @@ async def cli_main():
     try:
         
         # pick a strat (RANDOM, TRIPPLEWIN, BASELINE)
-        strat = 'TRIPPLEWIN'
+        strat = 'RANDOM'
         
         # create a performance counter
         s = time.perf_counter()
@@ -29,13 +29,13 @@ async def cli_main():
         
         # create a tda-api client session
         tda_client = get_client_session()
-
+        
         # get TD Ameritrade account details
         get_my_balance(tda_client)
         
         # select the symbols we want to trade
         stocks_to_trade = get_symbols(tda_client)
-
+        
         # load and run the strat
         load_strat(strat, tda_client, stocks_to_trade)
         

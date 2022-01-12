@@ -27,6 +27,7 @@ def get_nasdaq_screener(full_clean=True, dump_raw=False):
                      
     :return: list of symbol data
     '''
+##### TODO: list comprehension the appends<>    
     initial_symbol_list = []
     if not isinstance(dump_raw, bool):
         raise SymbolSelectTypeException('dump_raw must be a bool')
@@ -186,15 +187,19 @@ def filter_by_top_volume(tda_client, symbol_list, volume_thresh):
             
             if isinstance(r, httpx.Response):
                 if r.status_code in {200, 201, 202}:
-                    symbol_volume = r.json()['candles'].pop()['volume']
-                    if symbol_volume > volume_thresh:
-                        filtered_volume_symbols.append({'aware_datetime':symbol_data['aware_datetime'],
-                                                        'symbol':symbol_data['symbol'], 
-                                                        'last_price':symbol_data['last_price'],
-                                                        'net_change':symbol_data['net_change'],
-                                                        'market_cap':symbol_data['market_cap'],
-                                                        'volume':symbol_volume})
-            
+                    try:
+                        symbol_volume = r.json()['candles'].pop()['volume']
+                        if symbol_volume > volume_thresh:
+                            filtered_volume_symbols.append({'aware_datetime':symbol_data['aware_datetime'],
+                                                            'symbol':symbol_data['symbol'], 
+                                                            'last_price':symbol_data['last_price'],
+                                                            'net_change':symbol_data['net_change'],
+                                                            'market_cap':symbol_data['market_cap'],
+                                                            'volume':symbol_volume})
+                    except Exception as err:
+                        # TODO: should we remove the symbol if it fails volume data check <>
+                        pass
+
             if len(symbol_list) > 120:
                 throttle(0.5)
             
